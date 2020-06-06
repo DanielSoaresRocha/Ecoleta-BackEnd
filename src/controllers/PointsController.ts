@@ -17,8 +17,13 @@ class PointController {
             .distinct()
             .select('points.*')
 
-        console.log('pontos = ' + points)
-        return response.json(points)
+        const serializedPoints = points.map(point => {
+            return {
+                ...point,
+                image_url: `http://localhost:3333/uploads/${point.image}`,
+            }
+        })
+        return response.json(serializedPoints)
 
     }
     async create (request: Request, response: Response) {
@@ -35,9 +40,8 @@ class PointController {
 
         const trx = await knex.transaction() // para que uma query dependa da outra
 
-        // retorna um array de ids que foram cadastrados
         const point = {
-            image: 'https://blog.guiabolso.com.br/wp-content/uploads/2018/02/mercado-1-1024x681.jpg',
+            image: request.file.filename,
             name,
             email,
             whatsapp,
@@ -46,15 +50,19 @@ class PointController {
             city,
             uf
         }
-        const insertedIds = await trx('points').insert(point)
+        const insertedIds = await trx('points').insert(point) // retorna um array de ids que foram cadastrados
         const point_id = insertedIds[0]
 
-        const pointItems = items.map((item_id: Number) => {
-            return {
-                item_id,
-                point_id: point_id
-            }
-        })
+
+        const pointItems = items.split(',')
+            .map((item: String) => Number(item.trim()))
+            .map((item_id: Number) => {
+                return {
+                    item_id,
+                    point_id: point_id
+                }
+            })
+
         await trx('point_items').insert(pointItems)
 
         await trx.commit()
@@ -74,10 +82,14 @@ class PointController {
             .where('point_items.point_id', id)
             .select('items.title')
 
+        const serializedPoint = {
+            ...point,
+            image_url: `http://localhost:3333/uploads/${point.image}`
+        }
         if (!point) {
             return response.status(400).json({ message: 'Point not found' })
         } else {
-            return response.json({ point, items })
+            return response.json({ serializedPoint, items })
         }
     }
 }
